@@ -16,6 +16,7 @@ class PyCFA:
         self.m_blockSize = 0
         self.m_channels = 0
         self.previousSample = 0.0
+        self.counter = 0
         params = self.getParameterDescriptors()
         for param in params:
             setattr(self, param['identifier'], param['defaultValue'])
@@ -80,6 +81,7 @@ class PyCFA:
     def process(self, inbuf, timestamp):
         self.engine.writeInput('audio', numpy.array(inbuf))
         self.engine.process()
+        self.counter += self.m_stepSize
         return []
 
     def getRemainingFeatures(self):
@@ -87,12 +89,13 @@ class PyCFA:
         outputFeatureSet[0] = flist = FeatureList()
         self.engine.flush()
         feats = self.engine.readAllOutputs()
-        featlength = int(self.sumFrames) * self.m_stepSize
         results = feats['cfa'].tolist()
+        featlength = self.counter / len(results)
         for i in range(len(results)):
             f = Feature()
             f.hasTimestamp = True
-            f.timestamp = frame2RealTime(featlength*i, self.m_inputSampleRate)
+            f.timestamp = frame2RealTime(int(featlength * i),
+                                         self.m_inputSampleRate)
             f.values = [results[i]]
             flist.append(f)
         return outputFeatureSet
@@ -159,9 +162,9 @@ class PyCFA:
             {
                 'identifier': 'sumFrames',
                 'name': 'Summing Frames',
-                'description': 'Number of frames to sum up',
+                'description': 'Number of FFT frames to sum up',
                 'minValue': 1,
-                'maxValue': 1000,
+                'maxValue': 500,
                 'defaultValue': 100,
                 'isQuantized': True,
                 'quantizeStep': 1.0
@@ -171,7 +174,7 @@ class PyCFA:
                 'name': 'Step Size',
                 'description': 'Step between consecutive frames',
                 'minValue': 1,
-                'maxValue': 2048,
+                'maxValue': 1000,
                 'defaultValue': 512,
                 'isQuantized': True,
                 'quantizeStep': 1.0
